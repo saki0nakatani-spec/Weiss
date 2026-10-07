@@ -1,0 +1,364 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0}</style></head><body>
+<title>Weiss</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap">
+<style>
+  /* Layout: one full-bleed sheet of washi; a quiet tool strip floats at the foot like a brush rest. */
+  /* Single-theme by choice: the subject is a white sheet of paper. */
+  :root {
+    color-scheme: light;
+    --paper: #f7f6f2;
+    --fiber: #e6e3da;
+    --sumi: #1c1b1d;
+    --muted: #8a867c;
+    --rest: rgba(255, 255, 253, 0.86);
+    --rule: #dcd8cd;
+    --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --ui: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--sumi);
+    font-family: var(--ui);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #ink { cursor: crosshair; }
+
+  .mark {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 20px);
+    left: 20px;
+    display: flex; align-items: baseline; gap: 12px;
+    pointer-events: none;
+  }
+  .mark h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+  }
+  .mark span {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+  }
+  .hint {
+    position: fixed;
+    left: 50%; top: 50%;
+    transform: translate(-50%, 120px);
+    font-family: var(--display);
+    font-size: 15px;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    pointer-events: none;
+    transition: opacity .6s ease;
+    white-space: nowrap;
+  }
+  .hint.gone { opacity: 0; }
+
+  .rest {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 32px);
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+    gap: 6px 14px;
+    padding: 8px 14px;
+    background: var(--rest);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .group { display: flex; align-items: center; gap: 6px; }
+  .sep { width: 1px; height: 20px; background: var(--rule); }
+  .label {
+    font-size: 11px; color: var(--muted); letter-spacing: 0.12em;
+  }
+
+  .swatch {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--c);
+    box-shadow: inset 0 0 0 2px var(--paper);
+    cursor: pointer; padding: 0;
+  }
+  .swatch[aria-pressed="true"] { border-color: var(--c); }
+
+  .chip {
+    font: 500 13px/1 var(--ui);
+    color: var(--sumi);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 6px 10px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+  }
+  .chip:hover { border-color: var(--rule); }
+  .chip[aria-pressed="true"] { background: var(--sumi); color: var(--paper); }
+
+  input[type="range"] { width: 84px; accent-color: var(--sumi); }
+
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--sumi); outline-offset: 2px;
+  }
+
+  @media (max-width: 560px) {
+    .sep { display: none; }
+    .rest { border-radius: 18px; }
+    .mark span { display: none; }
+  }
+</style>
+
+<canvas id="paper" aria-hidden="true"></canvas>
+<canvas id="ink" aria-label="墨で描けるキャンバス"></canvas>
+
+<div class="mark">
+  <h1>Weiss</h1>
+  <span>真っ白キャンバス</span>
+</div>
+<div class="hint" id="hint">筆をおろしてみてください</div>
+
+<div class="rest" role="toolbar" aria-label="筆の設定">
+  <div class="group" id="inks">
+    <button class="swatch" style="--c:#1c1b1d" data-ink="#1c1b1d" aria-pressed="true" aria-label="墨" title="墨"></button>
+    <button class="swatch" style="--c:#24406a" data-ink="#24406a" aria-pressed="false" aria-label="藍" title="藍"></button>
+    <button class="swatch" style="--c:#b8442e" data-ink="#b8442e" aria-pressed="false" aria-label="朱" title="朱"></button>
+    <button class="swatch" style="--c:#8c6a3a" data-ink="#8c6a3a" aria-pressed="false" aria-label="煤竹" title="煤竹"></button>
+  </div>
+  <span class="sep"></span>
+  <label class="group">
+    <span class="label">太さ</span>
+    <input id="size" type="range" min="4" max="48" value="18">
+  </label>
+  <span class="sep"></span>
+  <div class="group" id="syms">
+    <button class="chip" data-n="1" data-m="0" aria-pressed="true">一筆</button>
+    <button class="chip" data-n="1" data-m="1" aria-pressed="false">鏡</button>
+    <button class="chip" data-n="6" data-m="1" aria-pressed="false">六花</button>
+    <button class="chip" data-n="8" data-m="0" aria-pressed="false">八方</button>
+  </div>
+  <span class="sep"></span>
+  <div class="group">
+    <button class="chip" id="undo" title="元に戻す (Ctrl+Z)">戻す</button>
+    <button class="chip" id="clear">白紙</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const paper = document.getElementById('paper');
+  const ink = document.getElementById('ink');
+  const pctx = paper.getContext('2d');
+  const ctx = ink.getContext('2d');
+  const hint = document.getElementById('hint');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const state = { color: '#1c1b1d', size: 18, n: 1, mirror: false };
+  const history = [];
+  const PAPER = [247, 246, 242];
+  let W = 0, H = 0, dpr = 1;
+
+  // --- washi texture: drawn once per resize on its own layer ---
+  function drawPaper() {
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pctx.fillStyle = '#f7f6f2';
+    pctx.fillRect(0, 0, W, H);
+    const fibers = Math.round(W * H / 900);
+    for (let i = 0; i < fibers; i++) {
+      const x = Math.random() * W, y = Math.random() * H;
+      const a = Math.random() * Math.PI, l = 4 + Math.random() * 18;
+      pctx.strokeStyle = `rgba(150,140,120,${0.03 + Math.random() * 0.05})`;
+      pctx.lineWidth = 0.4 + Math.random() * 0.6;
+      pctx.beginPath();
+      pctx.moveTo(x, y);
+      pctx.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + (Math.random() - .5) * 4,
+                            y + Math.sin(a) * l * 0.5 + (Math.random() - .5) * 4,
+                            x + Math.cos(a) * l, y + Math.sin(a) * l);
+      pctx.stroke();
+    }
+  }
+
+  function resize() {
+    const keep = document.createElement('canvas');
+    keep.width = ink.width; keep.height = ink.height;
+    if (ink.width) keep.getContext('2d').drawImage(ink, 0, 0);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    for (const c of [paper, ink]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    drawPaper();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (keep.width) ctx.drawImage(keep, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    history.length = 0;
+  }
+
+  // --- symmetry: every point is reflected/rotated about the sheet's centre ---
+  function images(x, y) {
+    const cx = W / 2, cy = H / 2, dx = x - cx, dy = y - cy, out = [];
+    for (let i = 0; i < state.n; i++) {
+      const t = i * Math.PI * 2 / state.n, c = Math.cos(t), s = Math.sin(t);
+      out.push([cx + dx * c - dy * s, cy + dx * s + dy * c]);
+      if (state.mirror) out.push([cx - dx * c - dy * s, cy - dx * s + dy * c]);
+    }
+    return out;
+  }
+
+  // --- brush: a bundle of bristles; ink runs dry along the stroke (kasure) ---
+  let stroke = null;
+
+  function begin(x, y, pressure, auto) {
+    if (!auto) {
+      history.push(ctx.getImageData(0, 0, ink.width, ink.height));
+      if (history.length > 20) history.shift();
+      hint.classList.add('gone');
+    }
+    const count = 22;
+    const bristles = [];
+    for (let i = 0; i < count; i++) {
+      const off = (i / (count - 1)) * 2 - 1;
+      bristles.push({ off: off + (Math.random() - .5) * 0.08, load: 0.55 + Math.random() * 0.45, prev: null });
+    }
+    const rgb = [1, 3, 5].map(i => parseInt(state.color.slice(i, i + 2), 16));
+    stroke = { x, y, r: state.size * 0.2, rgb, ink: 1, travelled: 0, bristles, pressure, angle: 0, color: state.color };
+  }
+
+  function move(x, y, pressure, dt) {
+    if (!stroke) return;
+    const s = stroke;
+    const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy);
+    if (d < 0.5) return;
+    const v = d / Math.max(dt, 1);                       // px per ms
+    const p = pressure > 0 && pressure !== 0.5 ? pressure * 1.6 : 1;
+    const target = state.size * 0.5 * p * Math.max(0.25, Math.min(1.1, 1.15 - v * 0.3));
+    s.r += (target - s.r) * 0.25;                          // settle the brush, no jumps
+    s.angle = Math.atan2(dy, dx);
+    s.travelled += d;
+    s.ink = Math.max(0, 1 - s.travelled / (state.size * 25 + 500));
+
+    const nx = -Math.sin(s.angle), ny = Math.cos(s.angle);
+    ctx.lineCap = 'round';
+    for (const b of s.bristles) {
+      // each bristle dries out at its own pace
+      const wet = b.load - (1 - s.ink) * 1.05;
+      const bx = x + nx * b.off * s.r, by = y + ny * b.off * s.r;
+      if (b.prev && wet > 0) {
+        // opaque tone mixed toward the paper, so overlapping segments never bead up
+        const k = Math.min(1, 0.45 + wet * 0.7);
+        const [r, g, bl] = s.rgb.map((c, j) => Math.round(c * k + PAPER[j] * (1 - k)));
+        ctx.strokeStyle = `rgb(${r},${g},${bl})`;
+        ctx.lineWidth = Math.max(0.8, s.r * 0.14);
+        const a = images(b.prev[0], b.prev[1]), z = images(bx, by);
+        ctx.beginPath();
+        for (let k = 0; k < a.length; k++) { ctx.moveTo(a[k][0], a[k][1]); ctx.lineTo(z[k][0], z[k][1]); }
+        ctx.stroke();
+      }
+      b.prev = [bx, by];
+    }
+    s.x = x; s.y = y;
+  }
+
+  function end() { stroke = null; }
+
+  // --- pointer input ---
+  let last = 0;
+  ink.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    cancelEnso();
+    ink.setPointerCapture(e.pointerId);
+    last = e.timeStamp;
+    begin(e.clientX, e.clientY, e.pressure);
+  });
+  ink.addEventListener('pointermove', e => {
+    if (!stroke) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of evs) {
+      move(ev.clientX, ev.clientY, ev.pressure, ev.timeStamp - last);
+      last = ev.timeStamp;
+    }
+  });
+  for (const t of ['pointerup', 'pointercancel']) ink.addEventListener(t, end);
+
+  // --- toolbar ---
+  function press(group, btn) {
+    for (const b of group.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === btn));
+  }
+  const inks = document.getElementById('inks');
+  inks.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.color = b.dataset.ink; press(inks, b);
+  });
+  const syms = document.getElementById('syms');
+  syms.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.n = +b.dataset.n; state.mirror = b.dataset.m === '1'; press(syms, b);
+  });
+  const size = document.getElementById('size');
+  size.addEventListener('input', () => { state.size = +size.value; });
+
+  function undo() {
+    cancelEnso();
+    const img = history.pop(); if (img) ctx.putImageData(img, 0, 0);
+  }
+  document.getElementById('undo').addEventListener('click', undo);
+  document.getElementById('clear').addEventListener('click', () => {
+    cancelEnso();
+    history.push(ctx.getImageData(0, 0, ink.width, ink.height));
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ink.width, ink.height); ctx.restore();
+  });
+  addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+  });
+
+  // --- opening ensō: the sheet starts with one brushed circle ---
+  let ensoTimer = null, userSize = null;
+  function finishEnso() {
+    ensoTimer = null; end();
+    if (userSize !== null) { state.size = userSize; userSize = null; }
+  }
+  function cancelEnso() {
+    if (ensoTimer) { cancelAnimationFrame(ensoTimer); finishEnso(); }
+  }
+  function enso() {
+    const cx = W / 2, cy = H / 2 - 20;
+    const R = Math.min(W, H) * 0.22;
+    const start = -Math.PI * 0.62, sweep = Math.PI * 1.86;
+    userSize = state.size; state.size = Math.max(14, Math.round(R / 5));
+    const at = u => {
+      const t = start + sweep * u;
+      const r = R * (1 + 0.03 * Math.sin(u * 7));
+      return [cx + Math.cos(t) * r, cy + Math.sin(t) * r];
+    };
+    const steps = 140;
+    let i = 0;
+    begin(...at(0), 0, true);
+    const tick = () => {
+      const per = reduced ? steps : 3;
+      for (let k = 0; k < per && i < steps; k++, i++) {
+        const u = i / steps;
+        const dt = 30 - u * u * 24;                // brush speeds up into the tail
+        move(...at(u), 0, dt);
+      }
+      if (i < steps) ensoTimer = requestAnimationFrame(tick);
+      else finishEnso();
+    };
+    ensoTimer = requestAnimationFrame(tick);
+  }
+
+  let rt;
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 120); });
+  resize();
+  enso();
+})();
+</script>
+</body></html>
